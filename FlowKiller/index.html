@@ -1,0 +1,1569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self';">
+<title>Flow Killer</title>
+<style>
+/* ── Reset & Base ───────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg0:      #0d0d0f;
+  --bg1:      #141416;
+  --bg2:      #1c1c20;
+  --bg3:      #242428;
+  --bg4:      #2e2e34;
+  --line:     #2a2a30;
+  --line2:    #38383f;
+  --txt:      #e2e2ea;
+  --txt2:     #7a7a8e;
+  --txt3:     #3e3e4e;
+  --red:      #ff3d5a;
+  --red-dim:  rgba(255,61,90,0.15);
+  --cyan:     #00d4ff;
+  --cyan-dim: rgba(0,212,255,0.12);
+  --amber:    #ffb340;
+  --green:    #00e5a0;
+  --purple:   #a78bfa;
+  --r:        4px;
+}
+
+html, body {
+  width: 100%; height: 100%;
+  overflow: hidden;
+  background: var(--bg0);
+  color: var(--txt);
+  font-family: 'Consolas', 'Courier New', monospace;
+  font-size: 11px;
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+/* ── Layout ─────────────────────────────────────────────── */
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ── Header ─────────────────────────────────────────────── */
+#header {
+  display: flex;
+  align-items: center;
+  height: 38px;
+  padding: 0 10px;
+  background: var(--bg1);
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+  gap: 8px;
+}
+
+#logo {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--red);
+  flex-shrink: 0;
+}
+
+#logo span { color: var(--txt3); font-weight: 400; }
+
+#compBadge {
+  flex: 1;
+  font-size: 9px;
+  color: var(--txt3);
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#compBadge b { color: var(--txt2); }
+
+#syncBtn {
+  width: 24px; height: 24px;
+  border: 1px solid var(--line2);
+  background: var(--bg3);
+  border-radius: var(--r);
+  color: var(--txt2);
+  cursor: pointer;
+  font-size: 13px;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+#syncBtn:hover { border-color: var(--cyan); color: var(--cyan); }
+#syncBtn.spinning { animation: spin 0.6s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Selection Bar ───────────────────────────────────────── */
+#selBar {
+  display: flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 10px;
+  background: var(--bg1);
+  border-bottom: 1px solid var(--line);
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+#selBar label { font-size: 9px; color: var(--txt3); text-transform: uppercase; letter-spacing: 0.5px; flex-shrink: 0; }
+
+#layerSel, #propSel {
+  flex: 1;
+  background: var(--bg2);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  color: var(--txt);
+  font-size: 10px;
+  font-family: inherit;
+  padding: 3px 5px;
+  outline: none;
+  min-width: 0;
+  cursor: pointer;
+}
+#layerSel:focus, #propSel:focus { border-color: var(--cyan); }
+#layerSel option, #propSel option { background: var(--bg2); }
+
+/* ── Tab Bar ─────────────────────────────────────────────── */
+#tabs {
+  display: flex;
+  background: var(--bg1);
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+}
+
+.tab {
+  flex: 1;
+  padding: 7px 4px;
+  text-align: center;
+  font-size: 9px;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--txt3);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.15s;
+}
+.tab:hover { color: var(--txt2); }
+.tab.active { color: var(--red); border-bottom-color: var(--red); }
+
+/* ── Content ─────────────────────────────────────────────── */
+#content {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.panel { display: none; flex: 1; flex-direction: column; overflow: hidden; }
+.panel.active { display: flex; }
+
+/* ── Graph Panel ─────────────────────────────────────────── */
+#graphPanel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+#graphPanel.active { display: flex; }
+
+/* Graph canvas area */
+#graphWrap {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  background: var(--bg0);
+  min-height: 200px;
+}
+
+#graphCanvas {
+  position: absolute;
+  top: 0; left: 0;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+/* Graph toolbar */
+#graphTools {
+  display: flex;
+  align-items: center;
+  height: 30px;
+  padding: 0 8px;
+  background: var(--bg1);
+  border-bottom: 1px solid var(--line);
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.ib {
+  height: 22px;
+  padding: 0 7px;
+  border-radius: var(--r);
+  border: 1px solid var(--line2);
+  background: var(--bg3);
+  color: var(--txt2);
+  font-size: 9px;
+  font-family: inherit;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.12s;
+  white-space: nowrap;
+  letter-spacing: 0.3px;
+}
+.ib:hover { color: var(--txt); border-color: var(--line2); background: var(--bg4); }
+.ib.active { background: var(--red-dim); border-color: var(--red); color: var(--red); }
+.ib.sq { width: 22px; padding: 0; }
+
+.tb-sep { width: 1px; height: 16px; background: var(--line); margin: 0 2px; flex-shrink: 0; }
+.tb-gap { flex: 1; }
+
+/* Ease controls */
+#easeControls {
+  padding: 8px 10px;
+  background: var(--bg1);
+  border-top: 1px solid var(--line);
+  flex-shrink: 0;
+}
+
+.ec-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.ec-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ec-label {
+  font-size: 9px;
+  color: var(--txt3);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.ec-vals {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.ec-slug {
+  font-size: 9px;
+  color: var(--txt3);
+  width: 28px;
+  flex-shrink: 0;
+}
+
+.ec-slider {
+  flex: 1;
+  -webkit-appearance: none;
+  height: 3px;
+  background: var(--bg4);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+.ec-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 11px; height: 11px;
+  border-radius: 50%;
+  cursor: pointer;
+}
+.ec-slider.out::-webkit-slider-thumb { background: var(--amber); }
+.ec-slider.in::-webkit-slider-thumb  { background: var(--cyan); }
+
+.ec-num {
+  width: 32px;
+  text-align: right;
+  font-size: 9px;
+  color: var(--txt);
+}
+
+/* Live indicator */
+#liveRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+#liveDot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--txt3);
+  transition: background 0.3s;
+  flex-shrink: 0;
+}
+#liveDot.on  { background: var(--green); box-shadow: 0 0 6px var(--green); }
+#liveDot.err { background: var(--red); }
+
+#liveMsg {
+  font-size: 9px;
+  color: var(--txt3);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.live-toggle {
+  font-size: 9px;
+  color: var(--txt2);
+  cursor: pointer;
+  padding: 2px 6px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: transparent;
+  font-family: inherit;
+  transition: all 0.12s;
+  flex-shrink: 0;
+}
+.live-toggle:hover { border-color: var(--green); color: var(--green); }
+.live-toggle.on { border-color: var(--green); color: var(--green); background: rgba(0,229,160,0.08); }
+
+/* ── Presets Panel ───────────────────────────────────────── */
+#presetsPanel {
+  overflow-y: auto;
+  padding: 8px;
+}
+#presetsPanel::-webkit-scrollbar { width: 3px; }
+#presetsPanel::-webkit-scrollbar-thumb { background: var(--line2); border-radius: 2px; }
+
+.preset-section-title {
+  font-size: 9px;
+  color: var(--txt3);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  padding: 4px 2px;
+  margin-bottom: 4px;
+  margin-top: 8px;
+}
+.preset-section-title:first-child { margin-top: 0; }
+
+.preset-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.preset-card {
+  background: var(--bg2);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 6px;
+  cursor: pointer;
+  transition: all 0.12s;
+  position: relative;
+  overflow: hidden;
+}
+.preset-card:hover { border-color: var(--red); background: var(--bg3); }
+.preset-card canvas { width: 100%; height: 36px; display: block; }
+.preset-card-name { font-size: 8px; color: var(--txt2); margin-top: 4px; text-align: center; letter-spacing: 0.3px; }
+
+/* ── Quick Actions ───────────────────────────────────────── */
+#quickPanel {
+  padding: 8px;
+  overflow-y: auto;
+}
+#quickPanel::-webkit-scrollbar { width: 3px; }
+#quickPanel::-webkit-scrollbar-thumb { background: var(--line2); border-radius: 2px; }
+
+.qa-title {
+  font-size: 9px;
+  color: var(--txt3);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  padding: 2px;
+  margin-bottom: 6px;
+  margin-top: 10px;
+}
+.qa-title:first-child { margin-top: 0; }
+
+.qa-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-bottom: 4px; }
+
+.qa-btn {
+  background: var(--bg2);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  color: var(--txt2);
+  font-family: inherit;
+  font-size: 9px;
+  padding: 7px 6px;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.12s;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  letter-spacing: 0.3px;
+}
+.qa-btn:hover { background: var(--bg3); border-color: var(--line2); color: var(--txt); }
+.qa-btn.red:hover   { border-color: var(--red);    color: var(--red);    background: var(--red-dim); }
+.qa-btn.cyan:hover  { border-color: var(--cyan);   color: var(--cyan);   background: var(--cyan-dim); }
+.qa-btn.amber:hover { border-color: var(--amber);  color: var(--amber);  background: rgba(255,179,64,0.1); }
+.qa-btn.green:hover { border-color: var(--green);  color: var(--green);  background: rgba(0,229,160,0.08); }
+
+.qa-btn .qa-icon { font-size: 11px; flex-shrink: 0; }
+.qa-btn span { flex: 1; }
+
+.qa-full { grid-column: 1 / -1; }
+
+/* Physics sliders */
+.phys-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 5px;
+}
+.phys-label { width: 62px; font-size: 9px; color: var(--txt2); flex-shrink: 0; }
+.phys-slider {
+  flex: 1;
+  -webkit-appearance: none;
+  height: 3px;
+  background: var(--bg4);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+.phys-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 11px; height: 11px;
+  border-radius: 50%;
+  background: var(--purple);
+  cursor: pointer;
+}
+.phys-val { width: 28px; font-size: 9px; color: var(--txt); text-align: right; }
+
+/* ── Toast ───────────────────────────────────────────────── */
+#toast {
+  position: fixed;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%) translateY(40px);
+  background: var(--bg3);
+  border: 1px solid var(--line2);
+  border-radius: var(--r);
+  padding: 6px 12px;
+  font-size: 10px;
+  color: var(--txt);
+  pointer-events: none;
+  z-index: 9999;
+  transition: transform 0.2s, opacity 0.2s;
+  opacity: 0;
+  white-space: nowrap;
+}
+#toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+#toast.err  { border-color: var(--red); color: var(--red); }
+#toast.ok   { border-color: var(--green); color: var(--green); }
+
+/* ── Empty state ─────────────────────────────────────────── */
+#emptyState {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 24px;
+  text-align: center;
+}
+#emptyState.hidden { display: none; }
+.empty-icon { font-size: 28px; opacity: 0.3; }
+.empty-title { font-size: 11px; color: var(--txt2); }
+.empty-sub { font-size: 9px; color: var(--txt3); line-height: 1.6; }
+.empty-btn {
+  margin-top: 4px;
+  padding: 6px 14px;
+  background: var(--bg3);
+  border: 1px solid var(--line2);
+  border-radius: var(--r);
+  color: var(--txt2);
+  font-size: 10px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+.empty-btn:hover { border-color: var(--cyan); color: var(--cyan); }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- Header -->
+  <div id="header">
+    <div id="logo">FK <span>/ FLOW KILLER</span></div>
+    <div id="compBadge">—</div>
+    <button id="syncBtn" title="Sync selection from AE">↻</button>
+  </div>
+
+  <!-- Selection Bar -->
+  <div id="selBar">
+    <label>Layer</label>
+    <select id="layerSel"><option>— no selection —</option></select>
+    <label>Prop</label>
+    <select id="propSel"><option>— no selection —</option></select>
+  </div>
+
+  <!-- Tabs -->
+  <div id="tabs">
+    <div class="tab active" data-tab="graph">Graph</div>
+    <div class="tab" data-tab="presets">Presets</div>
+    <div class="tab" data-tab="quick">Actions</div>
+  </div>
+
+  <!-- Content -->
+  <div id="content">
+
+    <!-- GRAPH PANEL -->
+    <div class="panel active" id="graphPanel">
+
+      <!-- Graph tools -->
+      <div id="graphTools">
+        <button class="ib sq active" id="toolSel"  title="Select (V)" onclick="setTool('sel')">↖</button>
+        <button class="ib sq"        id="toolAdd"  title="Add point (A)" onclick="setTool('add')">+</button>
+        <button class="ib sq"        id="toolDel"  title="Delete selected" onclick="delSelected()">✕</button>
+        <div class="tb-sep"></div>
+        <button class="ib sq" title="Fit view (F)" onclick="fitView()">⊡</button>
+        <button class="ib sq active" id="btnSnap" title="Snap" onclick="toggleSnap()">⊞</button>
+        <div class="tb-sep"></div>
+        <button class="ib" onclick="smoothPts()">〜 Smooth</button>
+        <div class="tb-gap"></div>
+        <button class="ib" id="modeVal" onclick="setMode('val')" style="color:var(--red);">V</button>
+        <button class="ib" id="modeSpd" onclick="setMode('spd')">S</button>
+      </div>
+
+      <!-- Graph canvas -->
+      <div id="graphWrap">
+        <canvas id="graphCanvas"></canvas>
+        <div id="emptyState">
+          <div class="empty-icon">⬡</div>
+          <div class="empty-title">No selection</div>
+          <div class="empty-sub">Select a layer with keyframes in After Effects, then sync.</div>
+          <button class="empty-btn" onclick="sync()">↻ Sync from AE</button>
+        </div>
+      </div>
+
+      <!-- Ease controls -->
+      <div id="easeControls">
+        <div class="ec-row">
+          <div class="ec-group">
+            <div class="ec-label">OUT (start) <span style="color:var(--amber)">●</span></div>
+            <div class="ec-vals">
+              <div class="ec-slug">spd</div>
+              <input type="range" class="ec-slider out" id="outSpd" min="0" max="500" step="1" value="0">
+              <div class="ec-num" id="outSpdV">0</div>
+            </div>
+            <div class="ec-vals">
+              <div class="ec-slug">inf</div>
+              <input type="range" class="ec-slider out" id="outInf" min="1" max="100" step="0.5" value="33">
+              <div class="ec-num" id="outInfV">33%</div>
+            </div>
+          </div>
+          <div class="ec-group">
+            <div class="ec-label">IN (end) <span style="color:var(--cyan)">●</span></div>
+            <div class="ec-vals">
+              <div class="ec-slug">spd</div>
+              <input type="range" class="ec-slider in" id="inSpd" min="0" max="500" step="1" value="0">
+              <div class="ec-num" id="inSpdV">0</div>
+            </div>
+            <div class="ec-vals">
+              <div class="ec-slug">inf</div>
+              <input type="range" class="ec-slider in" id="inInf" min="1" max="100" step="0.5" value="33">
+              <div class="ec-num" id="inInfV">33%</div>
+            </div>
+          </div>
+        </div>
+        <div id="liveRow">
+          <div id="liveDot"></div>
+          <div id="liveMsg">Not connected</div>
+          <button class="live-toggle" id="liveToggle" onclick="toggleLive()">LIVE OFF</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- PRESETS PANEL -->
+    <div class="panel" id="presetsPanel">
+      <div class="preset-section-title">Standard Easing</div>
+      <div class="preset-grid" id="presetGridStd"></div>
+      <div class="preset-section-title">Physics</div>
+      <div class="preset-grid" id="presetGridPhys"></div>
+      <div class="preset-section-title">Cinematic</div>
+      <div class="preset-grid" id="presetGridCine"></div>
+    </div>
+
+    <!-- QUICK ACTIONS PANEL -->
+    <div class="panel" id="quickPanel">
+      <div class="qa-title">Interpolation</div>
+      <div class="qa-grid">
+        <button class="qa-btn cyan"  onclick="aeEval('fk_easyEase()', feedbackCb)"><span class="qa-icon">◇</span><span>Easy Ease</span></button>
+        <button class="qa-btn"       onclick="aeEval('fk_setLinear()', feedbackCb)"><span class="qa-icon">╌</span><span>Linear</span></button>
+        <button class="qa-btn amber" onclick="aeEval('fk_setHold()', feedbackCb)"><span class="qa-icon">■</span><span>Hold</span></button>
+        <button class="qa-btn red"   onclick="applyCurrentToAll()"><span class="qa-icon">⟳</span><span>Apply Graph</span></button>
+      </div>
+
+      <div class="qa-title">Physics Generator</div>
+      <div class="phys-row"><div class="phys-label">Stiffness</div><input type="range" class="phys-slider" id="pStiff" min="0.01" max="1" step="0.01" value="0.4" oninput="updatePhysLabel('pStiff','pStiffV')"><div class="phys-val" id="pStiffV">0.40</div></div>
+      <div class="phys-row"><div class="phys-label">Damping</div><input type="range" class="phys-slider" id="pDamp"  min="0.01" max="1" step="0.01" value="0.7" oninput="updatePhysLabel('pDamp','pDampV')"><div class="phys-val" id="pDampV">0.70</div></div>
+      <div class="phys-row"><div class="phys-label">Overshoot</div><input type="range" class="phys-slider" id="pOver"  min="0"    max="2" step="0.01" value="0.2" oninput="updatePhysLabel('pOver','pOverV')"><div class="phys-val" id="pOverV">0.20</div></div>
+      <div class="qa-grid" style="margin-top:6px;">
+        <button class="qa-btn green qa-full" onclick="genSpring()"><span class="qa-icon">〜</span><span>Generate Spring Curve</span></button>
+      </div>
+
+      <div class="qa-title">Curve Tools</div>
+      <div class="qa-grid">
+        <button class="qa-btn" onclick="copyPts()"><span class="qa-icon">⎘</span><span>Copy Curve</span></button>
+        <button class="qa-btn" onclick="pastePts()"><span class="qa-icon">⎗</span><span>Paste Curve</span></button>
+        <button class="qa-btn" onclick="resetPts()"><span class="qa-icon">↺</span><span>Reset</span></button>
+        <button class="qa-btn" onclick="flipPts()"><span class="qa-icon">⇔</span><span>Flip H</span></button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<!-- CSInterface bridge -->
+<script>
+(function(){
+  // Raw CEP evalScript wrapper — tries multiple methods
+  function rawEval(script, cb) {
+    // Method 1: window.__adobe_cep__ (standard CEP)
+    if (typeof window.__adobe_cep__ !== 'undefined') {
+      window.__adobe_cep__.evalScript(script, cb || function(){});
+      return;
+    }
+    // Method 2: window.cep (older CEP)
+    if (typeof window.cep !== 'undefined' && window.cep.evalScript) {
+      window.cep.evalScript(script, cb || function(){});
+      return;
+    }
+    // Method 3: window.cep_node
+    if (typeof window.cep_node !== 'undefined') {
+      window.cep_node.require('child_process');
+      if (cb) cb(JSON.stringify({ok:false,data:'CEP bridge not available'}));
+      return;
+    }
+    if (cb) cb(JSON.stringify({ok:false,data:'Not running in CEP — open via AE Window > Extensions > Flow Killer'}));
+  }
+
+  function CSInterface(){}
+  CSInterface.prototype.evalScript = rawEval;
+  window.CSInterface = CSInterface;
+  window._cs = new CSInterface();
+
+  // Expose for debugging
+  window._fkDebug = function() {
+    return {
+      hasCEP: typeof window.__adobe_cep__ !== 'undefined',
+      hasCep: typeof window.cep !== 'undefined',
+      hasCepNode: typeof window.cep_node !== 'undefined',
+      keys: Object.keys(window).filter(function(k){ return k.indexOf('cep') !== -1 || k.indexOf('adobe') !== -1; })
+    };
+  };
+})();
+</script>
+
+<script>
+// ══════════════════════════════════════════════════════════
+// FLOW KILLER v2 — Main Script
+// ══════════════════════════════════════════════════════════
+
+// ── AE Bridge ────────────────────────────────────────────
+
+// Load host.jsx via evalFile — more reliable than inline embed
+var _hostLoaded = false;
+
+function _getExtPath() {
+  try {
+    // CSInterface gives us the extension root path
+    if (typeof window.__adobe_cep__ !== 'undefined') {
+      var info = JSON.parse(window.__adobe_cep__.getSystemPath('userData') || '{}');
+    }
+    // Fallback: use known CEP extensions path
+    return null;
+  } catch(e) { return null; }
+}
+
+
+function aeEval(script, cb) {
+  function runScript(s, callback) {
+    _cs.evalScript(s, function(res) {
+      var r;
+      // AE returns 'undefined' string for void functions — treat as ok
+      if (res === 'undefined' || res === undefined || res === null) {
+        if (callback) callback({ ok: true, data: 'ok' });
+        return;
+      }
+      try { r = JSON.parse(res); }
+      catch(e) { r = { ok: false, data: res }; }
+      if (callback) callback(r);
+    });
+  }
+
+  if (!_hostLoaded) {
+    // Load host.jsx via $.evalFile — most reliable method
+    // Get extension path from CEP system
+    var extPath = '';
+    try {
+      var cepSys = JSON.parse(window.__adobe_cep__.getSystemPath('hostApplication') || '""');
+    } catch(e) {}
+
+    // Use path relative to known CEP extensions location
+    var loadScript = [
+      'try {',
+      '  var _fkPaths = [',
+      '    $.getenv("APPDATA") + "/Adobe/CEP/extensions/FlowKiller2_fixed/jsx/host.jsx",',
+      '    $.getenv("HOME") + "/Library/Application Support/Adobe/CEP/extensions/FlowKiller2_fixed/jsx/host.jsx"',
+      '  ];',
+      '  var _fkLoaded = false;',
+      '  for (var _i = 0; _i < _fkPaths.length; _i++) {',
+      '    var _f = new File(_fkPaths[_i]);',
+      '    if (_f.exists) { $.evalFile(_f); _fkLoaded = true; break; }',
+      '  }',
+      '  _fkLoaded ? "loaded" : "notfound";',
+      '} catch(e) { "error:" + e.message; }'
+    ].join('\n');
+
+    _cs.evalScript(loadScript, function(loadRes) {
+      if (loadRes && loadRes.indexOf('error:') === 0) {
+        if (cb) cb({ ok: false, data: 'Host load error: ' + loadRes });
+        return;
+      }
+      if (loadRes === 'notfound') {
+        if (cb) cb({ ok: false, data: 'host.jsx not found. Check extension folder name is FlowKiller2_fixed' });
+        return;
+      }
+      _hostLoaded = true;
+      runScript(script, cb);
+    });
+  } else {
+    runScript(script, cb);
+  }
+}
+
+function feedbackCb(r) {
+  toast(r.data, r.ok ? 'ok' : 'err');
+}
+
+// ── State ─────────────────────────────────────────────────
+
+var S = {
+  tool: 'sel',         // 'sel' | 'add'
+  mode: 'val',         // 'val' | 'spd'
+  snap: true,
+  liveEnabled: false,
+  liveTimer: null,
+  pts: [],             // keypoints
+  sel: new Set(),
+  dragging: null,
+  isPan: false,
+  panStart: null,
+  panX: 0, panY: 0,
+  zoom: 1,
+  clipboard: null,
+  // AE selection
+  layers: [],
+  curLayerIdx: 0,
+  curPropIdx: 0,
+  connected: false
+};
+
+// ── Canvas ────────────────────────────────────────────────
+
+var cv = document.getElementById('graphCanvas');
+var ctx = cv.getContext('2d');
+var wrap = document.getElementById('graphWrap');
+var W = 0, H = 0;
+
+function resizeCv() {
+  var r = wrap.getBoundingClientRect();
+  W = r.width; H = r.height;
+  cv.width = W; cv.height = H;
+  render();
+}
+
+window.addEventListener('resize', resizeCv);
+
+// ── Coords ────────────────────────────────────────────────
+
+var PAD = { l: 28, r: 12, t: 12, b: 12 };
+
+function toC(tx, tv) {
+  var gw = W - PAD.l - PAD.r;
+  var gh = H - PAD.t - PAD.b;
+  var cx = PAD.l + S.panX + tx * gw * S.zoom;
+  var cy = PAD.t + (gh - S.panY) - tv * gh * 0.7 * S.zoom;
+  return [cx, cy];
+}
+
+function fromC(cx, cy) {
+  var gw = W - PAD.l - PAD.r;
+  var gh = H - PAD.t - PAD.b;
+  var tx = (cx - PAD.l - S.panX) / (gw * S.zoom);
+  var tv = ((PAD.t + gh - S.panY) - cy) / (gh * 0.7 * S.zoom);
+  return [tx, tv];
+}
+
+function snapV(v, g) { g = g || 0.05; return S.snap ? Math.round(v/g)*g : v; }
+
+// ── Default points ────────────────────────────────────────
+
+function defaultPts() {
+  return [
+    { t:0,   v:0,   ih:{x:0.08,y:0},   oh:{x:0.08,y:0.35} },
+    { t:0.5, v:0.5, ih:{x:0.10,y:0},   oh:{x:0.10,y:0}    },
+    { t:1,   v:1,   ih:{x:0.08,y:-0.3},oh:{x:0.08,y:0}    },
+  ];
+}
+
+function resetPts() {
+  S.pts = defaultPts();
+  S.sel.clear();
+  render();
+  scheduleLive();
+  toast('Reset');
+}
+
+// ── Bezier eval ───────────────────────────────────────────
+
+function cubic(p0,c1,c2,p3,t) {
+  var m=1-t; return m*m*m*p0 + 3*m*m*t*c1 + 3*m*t*t*c2 + t*t*t*p3;
+}
+
+function evalCurve(t) {
+  if (S.pts.length < 2) return t;
+  var pts = S.pts.slice().sort(function(a,b){return a.t-b.t;});
+  for (var i=0; i<pts.length-1; i++) {
+    var p0=pts[i], p1=pts[i+1];
+    if (t >= p0.t && t <= p1.t) {
+      var lt = (t-p0.t)/(p1.t-p0.t);
+      return cubic(p0.v, p0.v+p0.oh.y, p1.v-p1.ih.y, p1.v, lt);
+    }
+  }
+  return pts[pts.length-1].v;
+}
+
+// ── Render ────────────────────────────────────────────────
+
+function render() {
+  if (!W || !H) return;
+  ctx.clearRect(0,0,W,H);
+  drawBg();
+  drawGrid();
+  drawAxes();
+  if (S.mode === 'spd') drawSpeed();
+  drawCurve();
+  drawHandles();
+  drawPts();
+}
+
+function drawBg() {
+  ctx.fillStyle = '#0d0d0f';
+  ctx.fillRect(0,0,W,H);
+  // subtle gradient
+  var g = ctx.createRadialGradient(W*0.5,H*0.4,0,W*0.5,H*0.4,Math.max(W,H)*0.7);
+  g.addColorStop(0,'rgba(167,139,250,0.03)');
+  g.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0,0,W,H);
+}
+
+function drawGrid() {
+  var step = S.snap ? 0.1 : 0.25;
+  ctx.strokeStyle = 'rgba(42,42,48,0.9)';
+  ctx.lineWidth = 1;
+  for (var t=0; t<=1.001; t+=step) {
+    var c = toC(t,0);
+    ctx.beginPath(); ctx.moveTo(c[0],0); ctx.lineTo(c[0],H); ctx.stroke();
+  }
+  for (var v=-0.5; v<=1.501; v+=step) {
+    var c2 = toC(0,v);
+    ctx.beginPath(); ctx.moveTo(0,c2[1]); ctx.lineTo(W,c2[1]); ctx.stroke();
+  }
+  // major lines at 0 and 1
+  ctx.strokeStyle = 'rgba(60,60,70,0.9)';
+  [0,0.25,0.5,0.75,1].forEach(function(t2){
+    var c3 = toC(t2,0); ctx.beginPath(); ctx.moveTo(c3[0],0); ctx.lineTo(c3[0],H); ctx.stroke();
+  });
+}
+
+function drawAxes() {
+  var o = toC(0,0), t1 = toC(1,0), v1 = toC(0,1);
+  // x-axis
+  ctx.strokeStyle = 'rgba(255,61,90,0.35)'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(0,o[1]); ctx.lineTo(W,o[1]); ctx.stroke();
+  // y-axis
+  ctx.strokeStyle = 'rgba(0,212,255,0.25)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(o[0],0); ctx.lineTo(o[0],H); ctx.stroke();
+  // v=1 dashed
+  ctx.strokeStyle = 'rgba(0,229,160,0.2)'; ctx.setLineDash([3,4]);
+  ctx.beginPath(); ctx.moveTo(0,v1[1]); ctx.lineTo(W,v1[1]); ctx.stroke();
+  ctx.setLineDash([]);
+  // labels
+  ctx.fillStyle = 'rgba(62,62,78,0.9)'; ctx.font = '8px Consolas,monospace';
+  ctx.fillText('0',   o[0]+3, o[1]-4);
+  ctx.fillText('1',   o[0]+3, v1[1]-4);
+  ctx.fillText('t=1', t1[0]-22, o[1]-4);
+}
+
+function drawCurve() {
+  if (S.pts.length < 2) return;
+  var pts = S.pts.slice().sort(function(a,b){return a.t-b.t;});
+  ctx.strokeStyle = '#ff3d5a'; ctx.lineWidth = 2; ctx.shadowColor = 'rgba(255,61,90,0.35)'; ctx.shadowBlur = 6;
+  ctx.beginPath();
+  var steps = Math.max(100, W);
+  for (var i=0; i<=steps; i++) {
+    var t = i/steps;
+    var v = evalCurve(t);
+    var c = toC(t,v);
+    if (i===0) ctx.moveTo(c[0],c[1]); else ctx.lineTo(c[0],c[1]);
+  }
+  ctx.stroke(); ctx.shadowBlur = 0;
+}
+
+function drawSpeed() {
+  if (S.pts.length < 2) return;
+  ctx.strokeStyle = 'rgba(255,179,64,0.5)'; ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  var steps = W;
+  var prev = null;
+  for (var i=0; i<=steps; i++) {
+    var t = i/steps;
+    var v = evalCurve(t);
+    var spd = prev !== null ? Math.abs(v - prev) * steps * 2 : 0;
+    var c = toC(t, spd);
+    if (i===0) ctx.moveTo(c[0],c[1]); else ctx.lineTo(c[0],c[1]);
+    prev = v;
+  }
+  ctx.stroke();
+}
+
+function drawHandles() {
+  var pts = S.pts.slice().sort(function(a,b){return a.t-b.t;});
+  for (var i=0; i<pts.length; i++) {
+    var p = pts[i];
+    var showAll = S.sel.size === 0 || S.sel.has(p);
+    if (!showAll) continue;
+    var pc = toC(p.t, p.v);
+    // out handle
+    var oc = toC(p.t + p.oh.x, p.v + p.oh.y);
+    ctx.strokeStyle = 'rgba(255,179,64,0.6)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(pc[0],pc[1]); ctx.lineTo(oc[0],oc[1]); ctx.stroke();
+    ctx.fillStyle = '#ffb340';
+    ctx.beginPath(); ctx.arc(oc[0],oc[1],3.5,0,Math.PI*2); ctx.fill();
+    // in handle
+    var ic = toC(p.t - p.ih.x, p.v - p.ih.y);
+    ctx.strokeStyle = 'rgba(0,212,255,0.6)';
+    ctx.beginPath(); ctx.moveTo(pc[0],pc[1]); ctx.lineTo(ic[0],ic[1]); ctx.stroke();
+    ctx.fillStyle = '#00d4ff';
+    ctx.beginPath(); ctx.arc(ic[0],ic[1],3.5,0,Math.PI*2); ctx.fill();
+  }
+}
+
+function drawPts() {
+  for (var i=0; i<S.pts.length; i++) {
+    var p = S.pts[i];
+    var c = toC(p.t, p.v);
+    var sel = S.sel.has(p);
+    if (sel) {
+      ctx.strokeStyle = 'rgba(255,61,90,0.4)'; ctx.lineWidth = 1;
+      ctx.strokeRect(c[0]-7,c[1]-7,14,14);
+    }
+    ctx.fillStyle   = sel ? '#ff3d5a' : '#fff';
+    ctx.strokeStyle = sel ? '#ff3d5a' : 'rgba(255,61,90,0.5)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.rect(c[0]-4,c[1]-4,8,8); ctx.fill(); ctx.stroke();
+  }
+}
+
+// ── Interaction ───────────────────────────────────────────
+
+var selRect = null;
+
+cv.addEventListener('mousedown', function(e) {
+  var r = cv.getBoundingClientRect();
+  var mx = e.clientX - r.left, my = e.clientY - r.top;
+  var tc = fromC(mx, my);
+
+  if (e.button === 1 || (e.button === 0 && e.altKey)) {
+    S.isPan = true; S.panStart = { x: mx - S.panX, y: my - S.panY }; return;
+  }
+
+  if (S.tool === 'add') {
+    addPt(Math.max(0,Math.min(1,snapV(tc[0]))), snapV(tc[1]));
+    render(); scheduleLive(); return;
+  }
+
+  var hh = hitHandle(mx, my);
+  if (hh) { S.dragging = { type:'handle', ...hh }; return; }
+
+  var hp = hitPt(mx, my);
+  if (hp) {
+    if (!e.shiftKey) { if (!S.sel.has(hp)) { S.sel.clear(); S.sel.add(hp); } }
+    else { S.sel.has(hp) ? S.sel.delete(hp) : S.sel.add(hp); }
+    S.dragging = { type:'pts', sx:mx, sy:my, orig:[...S.sel].map(function(p){return {p,t:p.t,v:p.v};}) };
+    render(); return;
+  }
+
+  if (!e.shiftKey) S.sel.clear();
+  selRect = { x:mx, y:my, w:0, h:0 };
+  render();
+});
+
+cv.addEventListener('mousemove', function(e) {
+  var r = cv.getBoundingClientRect();
+  var mx = e.clientX - r.left, my = e.clientY - r.top;
+  var tc = fromC(mx, my);
+
+  if (S.isPan) {
+    S.panX = mx - S.panStart.x; S.panY = my - S.panStart.y;
+    render(); return;
+  }
+
+  if (S.dragging) {
+    if (S.dragging.type === 'handle') {
+      var p = S.dragging.point, hk = S.dragging.handle;
+      var nt = tc[0] - p.t, nv = tc[1] - p.v;
+      if (hk === 'oh') { p.oh.x = Math.max(0.001, nt); p.oh.y = nv; p.ih.y = -nv; }
+      else              { p.ih.x = Math.max(0.001,-nt); p.ih.y = -nv; p.oh.y = nv; }
+    } else {
+      var dx = mx - S.dragging.sx, dy = my - S.dragging.sy;
+      var gw = W - PAD.l - PAD.r, gh = H - PAD.t - PAD.b;
+      var dt = dx / (gw * S.zoom), dv = -dy / (gh * 0.7 * S.zoom);
+      S.dragging.orig.forEach(function(o){ o.p.t = Math.max(0,Math.min(1,snapV(o.t+dt))); o.p.v = snapV(o.v+dv); });
+    }
+    render(); scheduleLive(); return;
+  }
+
+  if (selRect) {
+    selRect.w = mx - selRect.x; selRect.h = my - selRect.y;
+    render();
+    ctx.strokeStyle = 'rgba(255,61,90,0.5)'; ctx.fillStyle = 'rgba(255,61,90,0.05)';
+    ctx.lineWidth = 1; ctx.setLineDash([2,3]);
+    ctx.beginPath(); ctx.rect(selRect.x,selRect.y,selRect.w,selRect.h); ctx.stroke(); ctx.fill();
+    ctx.setLineDash([]);
+    return;
+  }
+
+  var hp2 = hitPt(mx,my), hh2 = hitHandle(mx,my);
+  cv.style.cursor = hp2 ? 'move' : hh2 ? 'crosshair' : S.tool === 'add' ? 'cell' : 'crosshair';
+});
+
+cv.addEventListener('mouseup', function(e) {
+  S.isPan = false; S.panStart = null;
+  if (S.dragging) { S.dragging = null; }
+  if (selRect) {
+    var x0=Math.min(selRect.x,selRect.x+selRect.w), x1=Math.max(selRect.x,selRect.x+selRect.w);
+    var y0=Math.min(selRect.y,selRect.y+selRect.h), y1=Math.max(selRect.y,selRect.y+selRect.h);
+    S.pts.forEach(function(p){ var c=toC(p.t,p.v); if(c[0]>=x0&&c[0]<=x1&&c[1]>=y0&&c[1]<=y1) S.sel.add(p); });
+    selRect = null; render();
+  }
+});
+
+cv.addEventListener('wheel', function(e) {
+  e.preventDefault();
+  var f = e.deltaY > 0 ? 0.88 : 1.14;
+  var r = cv.getBoundingClientRect();
+  var mx = e.clientX - r.left, my = e.clientY - r.top;
+  S.panX = mx + (S.panX - mx)*f; S.panY = my + (S.panY - my)*f;
+  S.zoom = Math.max(0.1, Math.min(8, S.zoom*f));
+  render();
+}, { passive: false });
+
+function hitPt(mx, my) {
+  for (var i=0; i<S.pts.length; i++) {
+    var c = toC(S.pts[i].t, S.pts[i].v);
+    if (Math.abs(mx-c[0])<8 && Math.abs(my-c[1])<8) return S.pts[i];
+  }
+  return null;
+}
+
+function hitHandle(mx, my) {
+  for (var i=0; i<S.pts.length; i++) {
+    var p = S.pts[i];
+    if (S.sel.size > 0 && !S.sel.has(p)) continue;
+    var oc = toC(p.t+p.oh.x, p.v+p.oh.y);
+    if (Math.abs(mx-oc[0])<6 && Math.abs(my-oc[1])<6) return { point:p, handle:'oh' };
+    var ic = toC(p.t-p.ih.x, p.v-p.ih.y);
+    if (Math.abs(mx-ic[0])<6 && Math.abs(my-ic[1])<6) return { point:p, handle:'ih' };
+  }
+  return null;
+}
+
+function addPt(t, v) {
+  var p = { t:t, v:v, ih:{x:0.07,y:0}, oh:{x:0.07,y:0} };
+  S.pts.push(p); S.sel.clear(); S.sel.add(p);
+}
+
+function delSelected() {
+  if (S.sel.size === 0) { toast('Nothing selected', 'err'); return; }
+  S.pts = S.pts.filter(function(p){ return !S.sel.has(p); });
+  S.sel.clear(); render(); scheduleLive(); toast('Deleted');
+}
+
+// ── Tools & modes ─────────────────────────────────────────
+
+function setTool(t) {
+  S.tool = t;
+  document.getElementById('toolSel').classList.toggle('active', t==='sel');
+  document.getElementById('toolAdd').classList.toggle('active', t==='add');
+}
+
+function setMode(m) {
+  S.mode = m;
+  document.getElementById('modeVal').style.color = m==='val' ? 'var(--red)' : '';
+  document.getElementById('modeSpd').style.color = m==='spd' ? 'var(--amber)' : '';
+  render();
+}
+
+function toggleSnap() {
+  S.snap = !S.snap;
+  document.getElementById('btnSnap').classList.toggle('active', S.snap);
+  toast('Snap ' + (S.snap ? 'ON' : 'OFF'));
+}
+
+function fitView() {
+  S.panX = 0; S.panY = 0; S.zoom = 1; render();
+}
+
+function smoothPts() {
+  var pts = S.sel.size > 0 ? [...S.sel] : S.pts;
+  pts.forEach(function(p){ p.oh.y *= 0.4; p.ih.y *= 0.4; });
+  render(); scheduleLive(); toast('Smoothed');
+}
+
+function flipPts() {
+  S.pts.forEach(function(p){ p.t = 1 - p.t; var tmp=p.ih; p.ih=p.oh; p.oh=tmp; });
+  render(); scheduleLive(); toast('Flipped');
+}
+
+function copyPts() { S.clipboard = JSON.parse(JSON.stringify(S.pts)); toast('Curve copied'); }
+function pastePts() {
+  if (!S.clipboard) { toast('Nothing to paste', 'err'); return; }
+  S.pts = JSON.parse(JSON.stringify(S.clipboard)); S.sel.clear();
+  render(); scheduleLive(); toast('Curve pasted');
+}
+
+// ── Keyboard ──────────────────────────────────────────────
+
+document.addEventListener('keydown', function(e) {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+  if (e.key === 'v' || e.key === 'V') setTool('sel');
+  if (e.key === 'a' || e.key === 'A') setTool('add');
+  if (e.key === 'f' || e.key === 'F') fitView();
+  if (e.key === 'Delete' || e.key === 'Backspace') delSelected();
+  if (e.key === 'Escape') { S.sel.clear(); render(); }
+  if (e.ctrlKey && e.key === 'c') copyPts();
+  if (e.ctrlKey && e.key === 'v') pastePts();
+});
+
+// ── Ease sliders → live ───────────────────────────────────
+
+function sliderSetup(id, displayId, suffix, cb) {
+  var el = document.getElementById(id);
+  var dv = document.getElementById(displayId);
+  el.addEventListener('input', function() {
+    dv.textContent = parseFloat(el.value).toFixed(0) + (suffix || '');
+    cb();
+  });
+}
+
+sliderSetup('outSpd','outSpdV','', onEaseSlider);
+sliderSetup('outInf','outInfV','%', onEaseSlider);
+sliderSetup('inSpd', 'inSpdV', '', onEaseSlider);
+sliderSetup('inInf', 'inInfV', '%', onEaseSlider);
+
+function getEaseParams() {
+  return {
+    outSpeed: parseFloat(document.getElementById('outSpd').value),
+    outInf:   parseFloat(document.getElementById('outInf').value),
+    inSpeed:  parseFloat(document.getElementById('inSpd').value),
+    inInf:    parseFloat(document.getElementById('inInf').value),
+  };
+}
+
+function onEaseSlider() {
+  // Update curve visualization from sliders
+  var ep = getEaseParams();
+  var pts = S.pts.slice().sort(function(a,b){return a.t-b.t;});
+  if (pts.length >= 2) {
+    // Map influence to handle size, speed to handle angle
+    var outX = ep.outInf / 100 * 0.45;
+    var outY = ep.outSpeed / 500 * 0.8;
+    var inX  = ep.inInf  / 100 * 0.45;
+    var inY  = ep.inSpeed / 500 * 0.8;
+    pts[0].oh.x = outX; pts[0].oh.y = outY;
+    pts[pts.length-1].ih.x = inX; pts[pts.length-1].ih.y = inY;
+    render();
+  }
+  scheduleLive();
+}
+
+// ── Live sync to AE ───────────────────────────────────────
+
+function toggleLive() {
+  S.liveEnabled = !S.liveEnabled;
+  var btn = document.getElementById('liveToggle');
+  btn.textContent = S.liveEnabled ? 'LIVE ON' : 'LIVE OFF';
+  btn.classList.toggle('on', S.liveEnabled);
+  if (S.liveEnabled) {
+    setLiveDot('on', 'Live sync active');
+    scheduleLive(true);
+  } else {
+    setLiveDot('off', 'Live sync paused');
+  }
+}
+
+function setLiveDot(state, msg) {
+  var dot = document.getElementById('liveDot');
+  var lm  = document.getElementById('liveMsg');
+  dot.className = state; // 'on' | 'err' | ''
+  lm.textContent = msg || '';
+}
+
+function scheduleLive(immediate) {
+  if (!S.liveEnabled) return;
+  clearTimeout(S.liveTimer);
+  S.liveTimer = setTimeout(pushToAE, immediate ? 0 : 80);
+}
+
+function pushToAE() {
+  if (!S.connected) { setLiveDot('err', 'No AE selection'); return; }
+
+  var curLayer = S.layers[S.curLayerIdx];
+  if (!curLayer) return;
+  var curProp = curLayer.props[S.curPropIdx];
+  if (!curProp) return;
+
+  var ep = getEaseParams();
+  var params = {
+    layerIndex: curLayer.index,
+    matchName:  curProp.matchName,
+    keyIndex:   -1,
+    outSpeed: ep.outSpeed, outInf: ep.outInf,
+    inSpeed:  ep.inSpeed,  inInf:  ep.inInf,
+    interpType: 'bezier'
+  };
+
+  var js = "fk_applyEasing('" + JSON.stringify(params).replace(/'/g,"\\'") + "')";
+  aeEval(js, function(r) {
+    if (r.ok) setLiveDot('on', '✓ ' + r.data);
+    else      setLiveDot('err', r.data);
+  });
+}
+
+// ── Sync from AE ─────────────────────────────────────────
+
+function sync() {
+  var btn = document.getElementById('syncBtn');
+  btn.classList.add('spinning');
+
+  // Show debug info
+  var dbg = window._fkDebug ? window._fkDebug() : {};
+  var cepOk = dbg.hasCEP || dbg.hasCep;
+  if (!cepOk) {
+    btn.classList.remove('spinning');
+    setLiveDot('err', 'No CEP bridge — keys: ' + (dbg.keys || []).join(','));
+    toast('CEP not found. Keys: ' + JSON.stringify(dbg.keys), 'err');
+    return;
+  }
+
+  setLiveDot('', 'Loading host...');
+
+  aeEval('fk_readSelection()', function(r) {
+    btn.classList.remove('spinning');
+    if (!r.ok) {
+      S.connected = false;
+      setLiveDot('err', r.data);
+      toast(r.data, 'err');
+      showEmpty(r.data);
+      return;
+    }
+
+    var data = r.data;
+    S.layers = data.layers;
+    S.connected = true;
+
+    // Update comp badge
+    var fps = data.fps || 30;
+    var dur = (data.duration || 0).toFixed(1);
+    document.getElementById('compBadge').innerHTML =
+      '<b>' + data.compName + '</b> · ' + fps + 'fps · ' + dur + 's';
+
+    // Populate layer select
+    var lSel = document.getElementById('layerSel');
+    lSel.innerHTML = '';
+    data.layers.forEach(function(l, i) {
+      var opt = document.createElement('option');
+      opt.value = i; opt.textContent = '[' + l.index + '] ' + l.name;
+      lSel.appendChild(opt);
+    });
+    S.curLayerIdx = 0;
+    populateProps(0);
+
+    // Load existing easing values from first prop into sliders
+    var firstProp = data.layers[0] && data.layers[0].props[0];
+    if (firstProp) {
+      setSlider('outSpd', Math.round(Math.min(500, firstProp.outSpeed || 0)),   'outSpdV', '');
+      setSlider('outInf', Math.round(Math.min(100, firstProp.outInf   || 33.33)),'outInfV','%');
+      setSlider('inSpd',  Math.round(Math.min(500, firstProp.inSpeed  || 0)),   'inSpdV',  '');
+      setSlider('inInf',  Math.round(Math.min(100, firstProp.inInf    || 33.33)),'inInfV', '%');
+      // Update curve to match
+      onEaseSlider();
+    }
+
+    hideEmpty();
+    setLiveDot('on', 'Connected · ' + data.layers.length + ' layer(s)');
+    toast('Synced — ' + data.layers.length + ' layer(s)', 'ok');
+  });
+}
+
+function populateProps(layerIdx) {
+  var layer = S.layers[layerIdx];
+  if (!layer) return;
+  var pSel = document.getElementById('propSel');
+  pSel.innerHTML = '';
+  layer.props.forEach(function(p, i) {
+    var opt = document.createElement('option');
+    opt.value = i; opt.textContent = p.name + ' (' + p.numKeys + 'k)';
+    pSel.appendChild(opt);
+  });
+  S.curPropIdx = 0;
+  loadPropEasing(layer.props[0]);
+}
+
+function loadPropEasing(prop) {
+  if (!prop) return;
+  setSlider('outSpd', Math.round(Math.min(500, prop.outSpeed || 0)),    'outSpdV', '');
+  setSlider('outInf', Math.round(Math.min(100, prop.outInf   || 33.33)),'outInfV', '%');
+  setSlider('inSpd',  Math.round(Math.min(500, prop.inSpeed  || 0)),    'inSpdV',  '');
+  setSlider('inInf',  Math.round(Math.min(100, prop.inInf    || 33.33)),'inInfV',  '%');
+  onEaseSlider();
+}
+
+document.getElementById('layerSel').addEventListener('change', function() {
+  S.curLayerIdx = parseInt(this.value) || 0;
+  populateProps(S.curLayerIdx);
+  scheduleLive();
+});
+
+document.getElementById('propSel').addEventListener('change', function() {
+  S.curPropIdx = parseInt(this.value) || 0;
+  var layer = S.layers[S.curLayerIdx];
+  if (layer) loadPropEasing(layer.props[S.curPropIdx]);
+  scheduleLive();
+});
+
+document.getElementById('syncBtn').addEventListener('click', sync);
+
+function showEmpty(msg) {
+  var e = document.getElementById('emptyState');
+  e.classList.remove('hidden');
+  e.querySelector('.empty-sub').textContent = msg || 'Select a layer with keyframes in AE, then sync.';
+}
+function hideEmpty() {
+  document.getElementById('emptyState').classList.add('hidden');
+}
+
+// ── Apply to all selected ─────────────────────────────────
+
+function applyCurrentToAll() {
+  var ep = getEaseParams();
+  var params = { inSpeed: ep.inSpeed, inInf: ep.inInf, outSpeed: ep.outSpeed, outInf: ep.outInf };
+  var js = "fk_applyToAll('" + JSON.stringify(params).replace(/'/g,"\\'") + "')";
+  aeEval(js, feedbackCb);
+}
+
+// ── Tabs ──────────────────────────────────────────────────
+
+document.querySelectorAll('.tab').forEach(function(tab) {
+  tab.addEventListener('click', function() {
+    document.querySelectorAll('.tab').forEach(function(t){ t.classList.remove('active'); });
+    document.querySelectorAll('.panel').forEach(function(p){ p.classList.remove('active'); });
+    tab.classList.add('active');
+    var panelId = tab.dataset.tab + 'Panel';
+    // map tab id → panel id
+    var map = { graph:'graphPanel', presets:'presetsPanel', quick:'quickPanel' };
+    var panel = document.getElementById(map[tab.dataset.tab]);
+    if (panel) panel.classList.add('active');
+  });
+});
+
+// ── Presets ───────────────────────────────────────────────
+
+var PRESETS_STD = [
+  { name:'Ease In',    pts:[[0,0,0,0,0,0.4],[1,1,0,0,0,0]] },
+  { name:'Ease Out',   pts:[[0,0,0,0,0,0],[1,1,0.4,0,0,0]] },
+  { name:'Ease I+O',   pts:[[0,0,0,0,0,0.35],[1,1,0.35,0,0,0]] },
+  { name:'Linear',     pts:[[0,0,0,0,0,0],[1,1,0,0,0,0]] },
+  { name:'Sharp In',   pts:[[0,0,0,0,0,0.7],[1,1,0.1,0,0,0]] },
+  { name:'Sharp Out',  pts:[[0,0,0,0,0,0],[1,1,0.7,0,0,0]] },
+];
+var PRESETS_PHYS = [
+  { name:'Spring',    pts:[[0,0,0,0,0,0.3],[0.6,1.12,0.08,0,0.08,0],[0.8,0.97,0.06,0,0.06,0],[1,1,0.1,0,0,0]] },
+  { name:'Bounce',    pts:[[0,0,0,0,0,0.25],[0.5,1.18,0.1,0,0.1,0],[1,1,0.1,0,0,0]] },
+  { name:'Overshoot', pts:[[0,0,0,0,0,0.35],[0.75,1.08,0.1,0,0.1,0],[1,1,0.08,0,0,0]] },
+  { name:'Elastic',   pts:[[0,0,0,0,0,0.2],[0.4,1.15,0.08,0,0.08,0],[0.65,0.92,0.06,0,0.06,0],[0.82,1.04,0.05,0,0.05,0],[1,1,0.08,0,0,0]] },
+  { name:'Snap',      pts:[[0,0,0,0,0,0.08],[0.25,0.92,0.06,0,0.06,0],[1,1,0.2,0,0,0]] },
+  { name:'Heavy',     pts:[[0,0,0,0,0,0.6],[0.7,0.85,0.08,0,0.08,0],[1,1,0.15,0,0,0]] },
+];
+var PRESETS_CINE = [
+  { name:'Cinematic', pts:[[0,0,0,0,0,0.5],[1,1,0.25,0,0,0]] },
+  { name:'Dramatic',  pts:[[0,0,0,0,0,0.8],[0.8,0.95,0.06,0,0.06,0],[1,1,0.1,0,0,0]] },
+  { name:'Float',     pts:[[0,0,0,0,0,0.15],[0.5,0.6,0.2,0,0.2,0],[1,1,0.4,0,0,0]] },
+  { name:'Snappy',    pts:[[0,0,0,0,0,0.12],[0.2,0.9,0.06,0,0.06,0],[1,1,0.3,0,0,0]] },
+  { name:'Glide',     pts:[[0,0,0,0,0,0.25],[0.5,0.55,0.15,0,0.15,0],[1,1,0.35,0,0,0]] },
+  { name:'Impact',    pts:[[0,0,0,0,0,0.9],[0.5,1.0,0.04,0,0.04,0],[1,1,0.06,0,0,0]] },
+];
+
+function buildPresets(arr, gridId) {
+  var grid = document.getElementById(gridId);
+  grid.innerHTML = '';
+  arr.forEach(function(preset) {
+    var card = document.createElement('div');
+    card.className = 'preset-card';
+    var cid = 'pc_' + Math.random().toString(36).slice(2);
+    card.innerHTML = '<canvas id="' + cid + '" width="80" height="36"></canvas><div class="preset-card-name">' + preset.name + '</div>';
+    card.addEventListener('click', function() { applyPreset(preset); });
+    grid.appendChild(card);
+    setTimeout(function() { drawPresetThumb(cid, preset); }, 10);
+  });
+}
+
+function ptsFromPreset(preset) {
+  return preset.pts.map(function(row) {
+    return { t:row[0], v:row[1], ih:{x:row[2]||0.08,y:row[3]||0}, oh:{x:row[4]||0.08,y:row[5]||0} };
+  });
+}
+
+function presetEval(preset, t) {
+  var pts = ptsFromPreset(preset).sort(function(a,b){return a.t-b.t;});
+  for (var i=0; i<pts.length-1; i++) {
+    var p0=pts[i], p1=pts[i+1];
+    if (t>=p0.t && t<=p1.t) {
+      var lt=(t-p0.t)/(p1.t-p0.t);
+      return cubic(p0.v, p0.v+p0.oh.y, p1.v-p1.ih.y, p1.v, lt);
+    }
+  }
+  return pts[pts.length-1].v;
+}
+
+function drawPresetThumb(id, preset) {
+  var c2 = document.getElementById(id);
+  if (!c2) return;
+  var x = c2.getContext('2d');
+  x.clearRect(0,0,80,36);
+  x.strokeStyle = '#ff3d5a'; x.lineWidth = 1.5;
+  x.beginPath();
+  for (var i=0; i<=80; i++) {
+    var t=i/80, v=presetEval(preset,t);
+    var py = 32 - v*28;
+    if (i===0) x.moveTo(i, Math.max(2,Math.min(34,py)));
+    else       x.lineTo(i, Math.max(2,Math.min(34,py)));
+  }
+  x.stroke();
+}
+
+function applyPreset(preset) {
+  S.pts = ptsFromPreset(preset); S.sel.clear();
+  // Sync sliders from first/last pts
+  var pts = S.pts.slice().sort(function(a,b){return a.t-b.t;});
+  if (pts.length >= 2) {
+    var outInf = Math.round(pts[0].oh.x / 0.45 * 100);
+    var outSpd = Math.round(pts[0].oh.y / 0.8 * 500);
+    var inInf  = Math.round(pts[pts.length-1].ih.x / 0.45 * 100);
+    var inSpd  = Math.round(Math.abs(pts[pts.length-1].ih.y) / 0.8 * 500);
+    setSlider('outInf', Math.max(1,Math.min(100,outInf)), 'outInfV', '%');
+    setSlider('outSpd', Math.max(0,Math.min(500,outSpd)), 'outSpdV', '');
+    setSlider('inInf',  Math.max(1,Math.min(100,inInf)),  'inInfV',  '%');
+    setSlider('inSpd',  Math.max(0,Math.min(500,inSpd)),  'inSpdV',  '');
+  }
+  render();
+  scheduleLive();
+  toast('Applied: ' + preset.name, 'ok');
+  // Switch to graph tab
+  document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('active');});
+  document.querySelectorAll('.panel').forEach(function(p){p.classList.remove('active');});
+  document.querySelector('[data-tab="graph"]').classList.add('active');
+  document.getElementById('graphPanel').classList.add('active');
+}
+
+function setSlider(id, val, dispId, suffix) {
+  document.getElementById(id).value = val;
+  document.getElementById(dispId).textContent = val.toFixed(0) + (suffix||'');
+}
+
+// ── Physics ───────────────────────────────────────────────
+
+function updatePhysLabel(sid, vid) {
+  document.getElementById(vid).textContent = parseFloat(document.getElementById(sid).value).toFixed(2);
+}
+
+function springVal(t, k, d) {
+  var w = Math.sqrt(k) * 18, z = d;
+  if (z < 1) { var wd=w*Math.sqrt(1-z*z); return 1 - Math.exp(-z*w*t)*(Math.cos(wd*t)+(z*w/wd)*Math.sin(wd*t)); }
+  return 1 - (1+w*t)*Math.exp(-w*t);
+}
+
+function genSpring() {
+  var k = parseFloat(document.getElementById('pStiff').value);
+  var d = parseFloat(document.getElementById('pDamp').value);
+  var ov = parseFloat(document.getElementById('pOver').value);
+  var steps = 10;
+  var pts = [];
+  for (var i=0; i<=steps; i++) {
+    var t=i/steps, v=springVal(t,k,d)*(1+ov*Math.exp(-t*8)*Math.sin(t*Math.PI*4));
+    pts.push({ t:t, v:Math.max(-0.3,Math.min(1.5,v)), ih:{x:0.05,y:0}, oh:{x:0.05,y:0} });
+  }
+  S.pts = pts; S.sel.clear();
+  render(); scheduleLive();
+  toast('Spring generated', 'ok');
+  // Switch to graph
+  document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('active');});
+  document.querySelectorAll('.panel').forEach(function(p){p.classList.remove('active');});
+  document.querySelector('[data-tab="graph"]').classList.add('active');
+  document.getElementById('graphPanel').classList.add('active');
+}
+
+// ── Toast ─────────────────────────────────────────────────
+
+var toastTimer = null;
+function toast(msg, type) {
+  var el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'show ' + (type || '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function(){ el.className = ''; }, 2000);
+}
+
+// ── Init ──────────────────────────────────────────────────
+
+S.pts = defaultPts();
+buildPresets(PRESETS_STD,  'presetGridStd');
+buildPresets(PRESETS_PHYS, 'presetGridPhys');
+buildPresets(PRESETS_CINE, 'presetGridCine');
+
+window.addEventListener('load', function() {
+  setTimeout(function() { resizeCv(); }, 50);
+  // Auto-sync on load
+  setTimeout(sync, 300);
+});
+
+// Re-enable live toggle display state
+document.getElementById('liveToggle').textContent = 'LIVE OFF';
+
+</script>
+</body>
+</html>
