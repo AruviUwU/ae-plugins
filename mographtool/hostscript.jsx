@@ -4,6 +4,29 @@
 // =========================================
 
 // ================================
+// DISPATCHER — dipanggil dari main.js
+// ================================
+function mographTools(cmd) {
+    switch (cmd) {
+        case "stagger":
+            autoStagger(5);
+            break;
+        case "autobg":
+            autoBGFromText(20);
+            break;
+        case "bounce":
+            bounceIn();
+            break;
+        case "null":
+            autoNullController();
+            break;
+        default:
+            alert("Unknown command: " + cmd);
+    }
+}
+
+
+// ================================
 // 1. AUTO NULL CONTROLLER
 // ================================
 function autoNullController() {
@@ -45,13 +68,10 @@ function autoNullController() {
 }
 
 
-
-
 // ================================
 // 2. AUTO STAGGER (offset layer)
 // ================================
 function autoStagger(offsetFrames) {
-
     var comp = app.project.activeItem;
     if (!(comp instanceof CompItem)) {
         alert("Please select a composition.");
@@ -77,13 +97,10 @@ function autoStagger(offsetFrames) {
 }
 
 
-
-
 // ===================================
 // 3. AUTO BG FROM TEXT
 // ===================================
 function autoBGFromText(padding) {
-
     var comp = app.project.activeItem;
     if (!(comp instanceof CompItem)) {
         alert("Please select a composition.");
@@ -114,7 +131,7 @@ function autoBGFromText(padding) {
     var fill = rectGrp.property("Contents").addProperty("ADBE Vector Graphic - Fill");
 
     fill.property("Color").setValue([0, 0, 0]); // hitam default
-    fill.property("Opacity").setValue(80);      // 80% opacity
+    fill.property("Opacity").setValue(80);       // 80% opacity
 
     rectPath.property("Size").setValue([
         rect.width + padding * 2,
@@ -132,13 +149,10 @@ function autoBGFromText(padding) {
 }
 
 
-
-
 // =======================================
 // 4. BOUNCE IN ANIMATION (scale bounce)
 // =======================================
 function bounceIn() {
-
     var comp = app.project.activeItem;
     if (!(comp instanceof CompItem)) {
         alert("Please select a composition.");

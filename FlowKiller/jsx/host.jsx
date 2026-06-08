@@ -1,9 +1,14 @@
 // @target aftereffects
-// Flow Killer v2.2 — Host ExtendScript
-// AE CC 2020+ — fixes selection loss on panel focus
+// Flow Killer v2.3 — Host ExtendScript
+// AE CC 2020+ (CEP 9) compatible
 
 function ok(data) { return JSON.stringify({ ok: true,  data: data }); }
 function err(msg)  { return JSON.stringify({ ok: false, data: msg  }); }
+
+// Self-report path so the CEP panel can load us reliably
+function fk_getHostPath() {
+  try { return ok($.fileName); } catch(e) { return ok(''); }
+}
 
 function getPropDim(prop) {
   try { var v = prop.value; return (v instanceof Array) ? v.length : 1; }
@@ -56,11 +61,9 @@ function fk_readSelection() {
   if (!comp || !(comp instanceof CompItem))
     return err('No active composition. Double-click a comp in the Project panel.');
 
-  // Try selected layers first, fall back to all layers
   var selected = comp.selectedLayers;
   var layersToScan = (selected && selected.length > 0) ? selected : null;
 
-  // If nothing selected, scan all layers
   if (!layersToScan) {
     layersToScan = [];
     for (var i = 1; i <= comp.numLayers; i++) {
@@ -130,14 +133,14 @@ function fk_applyEasing(jsonStr) {
       prop.setTemporalEaseAtKey(ki, inArr, outArr);
     }
     app.endUndoGroup();
-    return ok('OK · ' + prop.numKeys + ' keys on "' + prop.name + '"');
+    return ok('OK \u00b7 ' + prop.numKeys + ' keys on "' + prop.name + '"');
   } catch(e) {
     app.endUndoGroup();
     return err('Error: ' + e.message);
   }
 }
 
-// ── Apply to ALL layers in comp ───────────────────────────
+// ── Apply to selected layers (or all) ────────────────────
 
 function fk_applyToAll(jsonStr) {
   var p;
@@ -146,7 +149,6 @@ function fk_applyToAll(jsonStr) {
   var comp = app.project.activeItem;
   if (!comp || !(comp instanceof CompItem)) return err('No active comp.');
 
-  // Use selected layers, or fall back to all
   var selected = comp.selectedLayers;
   var layers = (selected && selected.length > 0) ? selected : [];
   if (layers.length === 0) {
@@ -162,7 +164,7 @@ function fk_applyToAll(jsonStr) {
   var midSpd = (outSpd + inSpd) / 2;
   var midInf = (outInf + inInf) / 2;
 
-  app.beginUndoGroup('Flow Killer — Apply All');
+  app.beginUndoGroup('Flow Killer \u2014 Apply All');
   var total = 0;
   for (var li = 0; li < layers.length; li++) {
     walkProps(layers[li], function(prop) {
@@ -203,7 +205,7 @@ function _setAllKeys(fn, label) {
       try { layers.push(comp.layer(i)); } catch(e) {}
     }
   }
-  app.beginUndoGroup('Flow Killer — ' + label);
+  app.beginUndoGroup('Flow Killer \u2014 ' + label);
   var n = 0;
   for (var li = 0; li < layers.length; li++) {
     walkProps(layers[li], function(prop) {
@@ -215,13 +217,14 @@ function _setAllKeys(fn, label) {
     });
   }
   app.endUndoGroup();
-  return ok(n + ' keyframes → ' + label);
+  return ok(n + ' keyframes \u2192 ' + label);
 }
 
 function fk_easyEase() {
   return _setAllKeys(function(prop, ki, dim) {
     prop.setInterpolationTypeAtKey(ki, KeyframeInterpolationType.BEZIER, KeyframeInterpolationType.BEZIER);
-    var arr = []; for (var d = 0; d < dim; d++) arr.push(new KeyframeEase(0, 33.33));
+    var arr = [];
+    for (var d = 0; d < dim; d++) arr.push(new KeyframeEase(0, 33.33));
     prop.setTemporalEaseAtKey(ki, arr, arr);
   }, 'Easy Ease');
 }

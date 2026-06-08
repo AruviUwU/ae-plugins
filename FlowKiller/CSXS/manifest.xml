@@ -1,20 +1,22 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <ExtensionManifest xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
   ExtensionBundleId="com.flowkiller2.panel"
-  ExtensionBundleVersion="2.0.0"
+  ExtensionBundleVersion="2.3.0"
   Version="9.0">
   <ExtensionList>
-    <Extension Id="com.flowkiller2.panel.main" Version="2.0.0"/>
+    <Extension Id="com.flowkiller2.panel.main" Version="2.3.0"/>
   </ExtensionList>
   <ExecutionEnvironment>
     <HostList>
-      <Host Name="AEFT" Version="[17.0,99.9]"/>
+      <!-- AE CC 2019 = 16.x, AE CC 2020 = 17.x, upper bound open -->
+      <Host Name="AEFT" Version="[16.0,99.9]"/>
     </HostList>
     <LocaleList>
       <Locale Code="All"/>
     </LocaleList>
     <RequiredRuntimeList>
-      <RequiredRuntime Name="CSXS" Version="9.0"/>
+      <!-- CEP 8 = AE CC 2018+; CEP 9 = AE CC 2019+. Using 8 for widest compatibility. -->
+      <RequiredRuntime Name="CSXS" Version="8.0"/>
     </RequiredRuntimeList>
   </ExecutionEnvironment>
   <DispatchInfoList>

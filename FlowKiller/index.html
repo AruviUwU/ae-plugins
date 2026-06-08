@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self';">
-<title>Flow Killer</title>
+<title>Flow Killer v2.3</title>
 <style>
 /* ── Reset & Base ───────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -637,22 +637,14 @@ html, body {
 <!-- CSInterface bridge -->
 <script>
 (function(){
-  // Raw CEP evalScript wrapper — tries multiple methods
+  // Raw CEP evalScript wrapper (CEP 8/9, AE CC 2019+)
   function rawEval(script, cb) {
-    // Method 1: window.__adobe_cep__ (standard CEP)
     if (typeof window.__adobe_cep__ !== 'undefined') {
       window.__adobe_cep__.evalScript(script, cb || function(){});
       return;
     }
-    // Method 2: window.cep (older CEP)
     if (typeof window.cep !== 'undefined' && window.cep.evalScript) {
       window.cep.evalScript(script, cb || function(){});
-      return;
-    }
-    // Method 3: window.cep_node
-    if (typeof window.cep_node !== 'undefined') {
-      window.cep_node.require('child_process');
-      if (cb) cb(JSON.stringify({ok:false,data:'CEP bridge not available'}));
       return;
     }
     if (cb) cb(JSON.stringify({ok:false,data:'Not running in CEP — open via AE Window > Extensions > Flow Killer'}));
@@ -663,12 +655,10 @@ html, body {
   window.CSInterface = CSInterface;
   window._cs = new CSInterface();
 
-  // Expose for debugging
   window._fkDebug = function() {
     return {
       hasCEP: typeof window.__adobe_cep__ !== 'undefined',
       hasCep: typeof window.cep !== 'undefined',
-      hasCepNode: typeof window.cep_node !== 'undefined',
       keys: Object.keys(window).filter(function(k){ return k.indexOf('cep') !== -1 || k.indexOf('adobe') !== -1; })
     };
   };
@@ -676,32 +666,18 @@ html, body {
 </script>
 
 <script>
-// ══════════════════════════════════════════════════════════
-// FLOW KILLER v2 — Main Script
-// ══════════════════════════════════════════════════════════
+// ======================================================
+// FLOW KILLER v2.3 — Main Script (CEP 8/9, AE CC 2019+)
+// ======================================================
 
 // ── AE Bridge ────────────────────────────────────────────
 
-// Load host.jsx via evalFile — more reliable than inline embed
 var _hostLoaded = false;
-
-function _getExtPath() {
-  try {
-    // CSInterface gives us the extension root path
-    if (typeof window.__adobe_cep__ !== 'undefined') {
-      var info = JSON.parse(window.__adobe_cep__.getSystemPath('userData') || '{}');
-    }
-    // Fallback: use known CEP extensions path
-    return null;
-  } catch(e) { return null; }
-}
-
 
 function aeEval(script, cb) {
   function runScript(s, callback) {
     _cs.evalScript(s, function(res) {
       var r;
-      // AE returns 'undefined' string for void functions — treat as ok
       if (res === 'undefined' || res === undefined || res === null) {
         if (callback) callback({ ok: true, data: 'ok' });
         return;
@@ -713,40 +689,48 @@ function aeEval(script, cb) {
   }
 
   if (!_hostLoaded) {
-    // Load host.jsx via $.evalFile — most reliable method
-    // Get extension path from CEP system
-    var extPath = '';
-    try {
-      var cepSys = JSON.parse(window.__adobe_cep__.getSystemPath('hostApplication') || '""');
-    } catch(e) {}
+    // FIX: Probe whether ScriptPath already loaded host.jsx (the normal case).
+    // host.jsx exposes fk_getHostPath() — if it replies ok, we are good.
+    _cs.evalScript('try { fk_getHostPath(); } catch(e) { JSON.stringify({ok:false,data:String(e)}); }', function(probeRes) {
+      var probeOk = false;
+      try { probeOk = JSON.parse(probeRes).ok; } catch(ignore) {}
 
-    // Use path relative to known CEP extensions location
-    var loadScript = [
-      'try {',
-      '  var _fkPaths = [',
-      '    $.getenv("APPDATA") + "/Adobe/CEP/extensions/FlowKiller2_fixed/jsx/host.jsx",',
-      '    $.getenv("HOME") + "/Library/Application Support/Adobe/CEP/extensions/FlowKiller2_fixed/jsx/host.jsx"',
-      '  ];',
-      '  var _fkLoaded = false;',
-      '  for (var _i = 0; _i < _fkPaths.length; _i++) {',
-      '    var _f = new File(_fkPaths[_i]);',
-      '    if (_f.exists) { $.evalFile(_f); _fkLoaded = true; break; }',
-      '  }',
-      '  _fkLoaded ? "loaded" : "notfound";',
-      '} catch(e) { "error:" + e.message; }'
-    ].join('\n');
-
-    _cs.evalScript(loadScript, function(loadRes) {
-      if (loadRes && loadRes.indexOf('error:') === 0) {
-        if (cb) cb({ ok: false, data: 'Host load error: ' + loadRes });
+      if (probeOk) {
+        _hostLoaded = true;
+        runScript(script, cb);
         return;
       }
-      if (loadRes === 'notfound') {
-        if (cb) cb({ ok: false, data: 'host.jsx not found. Check extension folder name is FlowKiller2_fixed' });
-        return;
-      }
-      _hostLoaded = true;
-      runScript(script, cb);
+
+      // Fallback evalFile — searches common install folder names so any
+      // folder name works, not just "FlowKiller2_fixed".
+      var loadScript = [
+        '(function(){',
+        '  var paths = [',
+        '    $.getenv("APPDATA") + "/Adobe/CEP/extensions/FlowKiller/jsx/host.jsx",',
+        '    $.getenv("APPDATA") + "/Adobe/CEP/extensions/FlowKiller2/jsx/host.jsx",',
+        '    $.getenv("HOME") + "/Library/Application Support/Adobe/CEP/extensions/FlowKiller/jsx/host.jsx",',
+        '    $.getenv("HOME") + "/Library/Application Support/Adobe/CEP/extensions/FlowKiller2/jsx/host.jsx"',
+        '  ];',
+        '  for (var i = 0; i < paths.length; i++) {',
+        '    var f = new File(paths[i]);',
+        '    if (f.exists) { $.evalFile(f); return "loaded"; }',
+        '  }',
+        '  return "notfound";',
+        '})()'
+      ].join('\n');
+
+      _cs.evalScript(loadScript, function(loadRes) {
+        if (!loadRes || loadRes === 'notfound') {
+          if (cb) cb({ ok: false, data: 'host.jsx not found. Reinstall the extension.' });
+          return;
+        }
+        if (loadRes && loadRes.indexOf('error') === 0) {
+          if (cb) cb({ ok: false, data: 'Host load error: ' + loadRes });
+          return;
+        }
+        _hostLoaded = true;
+        runScript(script, cb);
+      });
     });
   } else {
     runScript(script, cb);
@@ -1007,13 +991,13 @@ cv.addEventListener('mousedown', function(e) {
   }
 
   var hh = hitHandle(mx, my);
-  if (hh) { S.dragging = { type:'handle', ...hh }; return; }
+  if (hh) { S.dragging = { type:'handle', point:hh.point, handle:hh.handle }; return; }
 
   var hp = hitPt(mx, my);
   if (hp) {
     if (!e.shiftKey) { if (!S.sel.has(hp)) { S.sel.clear(); S.sel.add(hp); } }
     else { S.sel.has(hp) ? S.sel.delete(hp) : S.sel.add(hp); }
-    S.dragging = { type:'pts', sx:mx, sy:my, orig:[...S.sel].map(function(p){return {p,t:p.t,v:p.v};}) };
+    S.dragging = (function(){ var orig=[]; S.sel.forEach(function(p){ orig.push({p:p,t:p.t,v:p.v}); }); return { type:'pts', sx:mx, sy:my, orig:orig }; })();
     render(); return;
   }
 
@@ -1139,7 +1123,7 @@ function fitView() {
 }
 
 function smoothPts() {
-  var pts = S.sel.size > 0 ? [...S.sel] : S.pts;
+  var pts = S.sel.size > 0 ? (function(){ var a=[]; S.sel.forEach(function(p){ a.push(p); }); return a; })() : S.pts;
   pts.forEach(function(p){ p.oh.y *= 0.4; p.ih.y *= 0.4; });
   render(); scheduleLive(); toast('Smoothed');
 }
@@ -1270,17 +1254,7 @@ function sync() {
   var btn = document.getElementById('syncBtn');
   btn.classList.add('spinning');
 
-  // Show debug info
-  var dbg = window._fkDebug ? window._fkDebug() : {};
-  var cepOk = dbg.hasCEP || dbg.hasCep;
-  if (!cepOk) {
-    btn.classList.remove('spinning');
-    setLiveDot('err', 'No CEP bridge — keys: ' + (dbg.keys || []).join(','));
-    toast('CEP not found. Keys: ' + JSON.stringify(dbg.keys), 'err');
-    return;
-  }
-
-  setLiveDot('', 'Loading host...');
+  setLiveDot('', 'Connecting to AE...');
 
   aeEval('fk_readSelection()', function(r) {
     btn.classList.remove('spinning');
@@ -1556,9 +1530,19 @@ buildPresets(PRESETS_PHYS, 'presetGridPhys');
 buildPresets(PRESETS_CINE, 'presetGridCine');
 
 window.addEventListener('load', function() {
-  setTimeout(function() { resizeCv(); }, 50);
-  // Auto-sync on load
-  setTimeout(sync, 300);
+  // FIX: Use ResizeObserver for reliable canvas sizing once panel is visible.
+  // setTimeout(50) was a race condition — panel might not be laid out yet.
+  if (typeof ResizeObserver !== 'undefined') {
+    var ro = new ResizeObserver(function() { resizeCv(); });
+    ro.observe(wrap);
+  } else {
+    // Fallback for very old CEP (Chromium < 64)
+    setTimeout(resizeCv, 100);
+    window.addEventListener('resize', resizeCv);
+  }
+  resizeCv(); // best-effort immediate call
+  // Auto-sync on load — give AE a moment to settle
+  setTimeout(sync, 400);
 });
 
 // Re-enable live toggle display state

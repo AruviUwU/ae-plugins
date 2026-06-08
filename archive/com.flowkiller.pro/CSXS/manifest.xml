@@ -1,0 +1,44 @@
+
+<?xml version="1.0" encoding="UTF-8"?>
+<ExtensionManifest Version="6.0" ExtensionBundleId="com.flowkiller.pro"
+ExtensionBundleVersion="1.0.0" ExtensionBundleName="Flow Killer Pro">
+ <ExtensionList>
+  <Extension Id="com.flowkiller.pro.panel"/>
+ </ExtensionList>
+
+ <ExecutionEnvironment>
+  <HostList>
+   <Host Name="AEFT" Version="[17.0,17.9]"/>
+  </HostList>
+  <LocaleList>
+   <Locale Code="All"/>
+  </LocaleList>
+  <RequiredRuntimeList>
+   <RequiredRuntime Name="CSXS" Version="10.0"/>
+  </RequiredRuntimeList>
+ </ExecutionEnvironment>
+
+ <DispatchInfoList>
+  <Extension Id="com.flowkiller.pro.panel">
+   <DispatchInfo>
+    <Resources>
+     <MainPath>index.html</MainPath>
+     <ScriptPath>jsx/apply.jsx</ScriptPath>
+    </Resources>
+    <Lifecycle>
+     <AutoVisible>true</AutoVisible>
+    </Lifecycle>
+    <UI>
+     <Type>Panel</Type>
+     <Menu>Flow Killer Pro</Menu>
+     <Geometry>
+      <Size>
+       <Height>300</Height>
+       <Width>340</Width>
+      </Size>
+     </Geometry>
+    </UI>
+   </DispatchInfo>
+  </Extension>
+ </DispatchInfoList>
+</ExtensionManifest>

@@ -2,7 +2,8 @@
 <ExtensionList>
   <Extension Id="com.flowkiller2.panel.main">
     <HostList>
-      <Host Name="AEFT" Port="8088"/>
+      <!-- Remove this file or comment out Host entries for production builds -->
+      <!-- <Host Name="AEFT" Port="8088"/> -->
     </HostList>
   </Extension>
 </ExtensionList>

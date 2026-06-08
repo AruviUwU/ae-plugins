@@ -4,21 +4,21 @@
     </ExtensionList>
     <ExecutionEnvironment>
         <HostList>
-            <Host Name="AEFT" Version="[14.0, 99.9]"/>
+            <Host Name="AEFT" Version="[17.0, 99.9]"/>
         </HostList>
         <LocaleList>
             <Locale Code="All"/>
         </LocaleList>
         <RequiredRuntimeList>
-            <RequiredRuntime Name="CSXS" Version="9.0"/>
+            <RequiredRuntime Name="CSXS" Version="10.0"/>
         </RequiredRuntimeList>
     </ExecutionEnvironment>
     <DispatchInfoList>
         <Extension Id="com.mograph.tools.panel">
             <DispatchInfo>
                 <Resources>
-                    <MainPath>index.html</MainPath>
-                    <ScriptPath>main.js</ScriptPath>
+                    <MainPath>./index.html</MainPath>
+                    <ScriptPath>./hostscript.jsx</ScriptPath>
                     <CEFCommandLine/>
                 </Resources>
                 <UI>
